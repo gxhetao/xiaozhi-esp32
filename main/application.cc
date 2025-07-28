@@ -14,6 +14,9 @@
 #include <cJSON.h>
 #include <driver/gpio.h>
 #include <arpa/inet.h>
+#include <mdns.h>
+
+#include "zbeacon_gw.h"
 
 #define TAG "Application"
 
@@ -490,6 +493,36 @@ void Application::Start() {
         }
     });
     bool protocol_started = protocol_->Start();
+
+    zbeacon::MCPServer::GetInstance().Start();
+
+    {
+        esp_err_t ret = mdns_init();
+
+        if ( ret == ESP_OK )
+        {
+            mdns_hostname_set( "xiaozhi-zbeacon" );
+
+            mdns_service_add( "xiaozhi", "_zbeacon", "_tcp", 80, NULL, 0 );
+
+            mdns_txt_item_t items[ 3 ];
+
+            items[ 0 ].key   = "MAC";
+            items[ 0 ].value = zbeacon::MCPServer::GetInstance().GetMqttClientID().c_str();
+
+            items[ 1 ].key   = "manufacturer";
+            items[ 1 ].value = "zbeacon";
+
+            items[ 2 ].key   = "model";
+            items[ 2 ].value = "xiaozhi";
+
+            mdns_service_txt_set( "_zbeacon", "_tcp", items, sizeof( items ) / sizeof( mdns_txt_item_t ) );
+        }
+        else
+        {
+            ESP_LOGE( TAG, "mDNS initialize failed: %s", esp_err_to_name( ret ) );
+        }
+    }
 
     SetDeviceState(kDeviceStateIdle);
 

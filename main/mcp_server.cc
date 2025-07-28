@@ -14,6 +14,8 @@
 #include "display.h"
 #include "board.h"
 
+#include "zbeacon_gw.h"
+
 #define TAG "MCP"
 
 #define DEFAULT_TOOLCALL_STACK_SIZE 6144
@@ -102,6 +104,88 @@ void McpServer::AddCommonTools() {
                 return camera->Explain(question);
             });
     }
+
+    // Smart home control interface
+
+    AddTool( "zbeacon.get_devices",
+        "Provides a list of external devices with their unique identifiers, names, models, and physical locations.",
+        PropertyList(),
+        []( const PropertyList & properties ) -> ReturnValue {
+
+            ESP_LOGI( TAG, "Call zbeacon.get_devices()" );
+
+            std::string result = zbeacon::MCPServer::GetInstance().GetDevices();
+
+            if ( result.empty() )
+            {
+                return "{}";
+            }
+
+            return result;
+        }
+    );
+
+    AddTool( "zbeacon.get_schemas",
+        "Provide a list of the functions available in the device model.",
+        PropertyList( {
+            Property( "model", kPropertyTypeString )
+        } ),
+        []( const PropertyList & properties ) -> ReturnValue {
+
+            auto model = properties[ "model" ].value< std::string >();
+
+            ESP_LOGI( TAG, "Call zbeacon.get_schemas( %s )", model.c_str() );
+
+            std::string result = zbeacon::MCPServer::GetInstance().GetSchemas( model.c_str() );
+
+            if ( result.empty() )
+            {
+                return "{}";
+            }
+
+            return result;
+        }
+    );
+
+    AddTool( "zbeacon.get_status",
+        "Provide real-time information about the device based on its uuid.",
+        PropertyList( {
+            Property( "uuid", kPropertyTypeString )
+        } ),
+        []( const PropertyList & properties ) -> ReturnValue {
+
+            auto uuid = properties[ "uuid" ].value< std::string >();
+
+            ESP_LOGI( TAG, "Call zbeacon.get_status( %s )", uuid.c_str() );
+
+            std::string result = zbeacon::MCPServer::GetInstance().GetStatus( uuid.c_str() );
+
+            if ( result.empty() )
+            {
+                return "{}";
+            }            
+
+            return result;
+        }
+    );
+
+    AddTool( "zbeacon.invoke",
+        "Provide the ability to control peripheral device.\n"
+        "Use this tool for:\n"
+        "1. Use uuid to indicate the device to be controlled.\n"
+        "2. Control the device according to its functional description (e.g. [{\"uuid\":\"000000000000\",\"Power\":true}]",
+        PropertyList( {
+            Property( "command", kPropertyTypeString )
+        } ),
+        []( const PropertyList & properties ) -> ReturnValue {
+
+            auto cmnd = properties[ "command" ].value< std::string >();
+
+            ESP_LOGI( TAG, "Call zbeacon.invoke( %s )", cmnd.c_str() );
+
+            return zbeacon::MCPServer::GetInstance().Invoke( cmnd.c_str() );
+        }
+    );
 
     // Restore the original tools list to the end of the tools list
     tools_.insert(tools_.end(), original_tools.begin(), original_tools.end());
